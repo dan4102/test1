@@ -2,6 +2,7 @@ import os
 import sqlite3
 import random
 import string
+import asyncio
 
 from PIL import Image
 
@@ -113,6 +114,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         ["🎨 Создать стикеры"],
+        ["📦 Сделать стикерпак"],
         ["🗑 Очистить"]
     ]
 
@@ -123,10 +125,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = (
         "👋 Добро пожаловать на мемный завод.\n\n"
-        "📸 Кидай фотки.\n"
+        "📸 Отправляй фотки.\n"
         "🔥 Я превращу их в стикеры.\n\n"
-        "⚠️ Побочный эффект:\n"
-        "друзья будут спамить твоим лицом."
+        "После загрузки нажми:\n"
+        "📦 Сделать стикерпак"
     )
 
     await update.message.reply_text(
@@ -153,7 +155,8 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     image = Image.open(input_path).convert("RGBA")
 
-    image.thumbnail((512, 512))
+    # Качественный ресайз
+    image.thumbnail((512, 512), Image.LANCZOS)
 
     canvas = Image.new(
         "RGBA",
@@ -179,8 +182,8 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total = len(get_user_stickers(user_id))
 
     await update.message.reply_text(
-        f"✅ Фото добавлено!\n"
-        f"Сейчас стикеров: {total}"
+        f"✅ Фото обработано!\n"
+        f"📦 Стикеров в очереди: {total}"
     )
 
 # ================= CREATE PACK =================
@@ -188,7 +191,6 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def create_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
-
     user_id = user.id
 
     sticker_paths = get_user_stickers(user_id)
@@ -196,7 +198,7 @@ async def create_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(sticker_paths) == 0:
 
         await update.message.reply_text(
-            "😢 У тебя нет загруженных фоток."
+            "😢 Ты ещё не загрузил фотки."
         )
 
         return
@@ -205,46 +207,65 @@ async def create_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pack_title = f"{user.first_name} MEM PACK"
 
-    # Первый стикер
-    with open(sticker_paths[0], "rb") as sticker_file:
+    try:
 
-        first_sticker = InputSticker(
-            sticker=sticker_file,
-            emoji_list=["😂"]
-        )
+        # Первый стикер
+        with open(sticker_paths[0], "rb") as sticker_file:
 
-        await context.bot.create_new_sticker_set(
-            user_id=user_id,
-            name=pack_name,
-            title=pack_title,
-            stickers=[first_sticker],
-            sticker_format="static"
-        )
-
-    # Остальные
-    for path in sticker_paths[1:]:
-
-        with open(path, "rb") as sticker_file:
-
-            sticker = InputSticker(
+            first_sticker = InputSticker(
                 sticker=sticker_file,
-                emoji_list=["🔥"]
+                emoji_list=["😂"]
             )
 
-            await context.bot.add_sticker_to_set(
+            await context.bot.create_new_sticker_set(
                 user_id=user_id,
                 name=pack_name,
-                sticker=sticker
+                title=pack_title,
+                stickers=[first_sticker],
+                sticker_format="static"
             )
 
-    pack_link = f"https://t.me/addstickers/{pack_name}"
+        # Остальные стикеры
+        for path in sticker_paths[1:]:
 
-    await update.message.reply_text(
-        f"🎉 Стикерпак готов!\n\n"
-        f"{pack_link}"
-    )
+            with open(path, "rb") as sticker_file:
 
-    clear_user_stickers(user_id)
+                sticker = InputSticker(
+                    sticker=sticker_file,
+                    emoji_list=["🔥"]
+                )
+
+                await context.bot.add_sticker_to_set(
+                    user_id=user_id,
+                    name=pack_name,
+                    sticker=sticker
+                )
+
+        # Telegram иногда тормозит
+        await asyncio.sleep(2)
+
+        pack_link = f"https://t.me/addstickers/{pack_name}"
+
+        await update.message.reply_text(
+            f"🎉 Стикерпак готов!\n\n"
+            f"{pack_link}"
+        )
+
+        # Отправляем первый стикер сразу в чат
+        with open(sticker_paths[0], "rb") as sticker_file:
+
+            await update.message.reply_sticker(
+                sticker=sticker_file
+            )
+
+        # Чистим только после отправки
+        clear_user_stickers(user_id)
+
+    except Exception as e:
+
+        await update.message.reply_text(
+            f"❌ Ошибка:\n{e}"
+        )
 
 # ================= CLEAR =================
 
@@ -267,8 +288,12 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "🎨 Создать стикеры":
 
         await update.message.reply_text(
-            "📸 Отправляй фотки!"
+            "📸 Просто отправляй фотки."
         )
+
+    elif text == "📦 Сделать стикерпак":
+
+        await create_pack(update, context)
 
     elif text == "🗑 Очистить":
 
