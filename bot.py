@@ -19,7 +19,7 @@ from telegram.ext import (
     filters,
 )
 
-TOKEN = "token"
+TOKEN = "8661575521:AAHD_C0EYhrZPRnYnLxx3zSlsojvt9vp6ic"
 BOT_USERNAME = "creaturestck_bot"
 
 os.makedirs("stickers", exist_ok=True)
