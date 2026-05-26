@@ -19,8 +19,8 @@ from telegram.ext import (
     filters,
 )
 
-TOKEN = "YOUR_BOT_TOKEN"
-BOT_USERNAME = "YOUR_BOT_USERNAME"
+TOKEN = "TOKEN" 
+BOT_USERNAME = "NAME"
 
 os.makedirs("stickers", exist_ok=True)
 
@@ -40,7 +40,11 @@ FUNNY_MESSAGES = [
 
 # ================= DATABASE =================
 
-db = sqlite3.connect("database.db", check_same_thread=False)
+db = sqlite3.connect(
+    "database.db",
+    check_same_thread=False
+)
+
 cursor = db.cursor()
 
 cursor.execute("""
@@ -62,38 +66,50 @@ db.commit()
 # ================= HELPERS =================
 
 def random_pack_name(user_id):
-    rand = ''.join(random.choices(string.ascii_lowercase, k=6))
+
+    rand = ''.join(
+        random.choices(string.ascii_lowercase, k=6)
+    )
+
     return f"pack_{user_id}_{rand}_by_{BOT_USERNAME}"
 
 
 def add_user(user_id):
+
     cursor.execute(
         "INSERT OR IGNORE INTO users (user_id) VALUES (?)",
         (user_id,)
     )
+
     db.commit()
 
 
 def add_sticker(user_id, file_path):
+
     cursor.execute(
         "INSERT INTO stickers (user_id, file_path) VALUES (?, ?)",
         (user_id, file_path)
     )
+
     db.commit()
 
 
 def get_user_stickers(user_id):
+
     cursor.execute(
         "SELECT file_path FROM stickers WHERE user_id=?",
         (user_id,)
     )
+
     return [row[0] for row in cursor.fetchall()]
 
 
 def clear_user_stickers(user_id):
+
     stickers = get_user_stickers(user_id)
 
     for path in stickers:
+
         if os.path.exists(path):
             os.remove(path)
 
@@ -101,6 +117,7 @@ def clear_user_stickers(user_id):
         "DELETE FROM stickers WHERE user_id=?",
         (user_id,)
     )
+
     db.commit()
 
 # ================= START =================
@@ -108,6 +125,7 @@ def clear_user_stickers(user_id):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
+
     add_user(user_id)
 
     keyboard = [
@@ -115,12 +133,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["🗑 Очистить"]
     ]
 
-    markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    markup = ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True
+    )
 
     await update.message.reply_text(
-        "👋 Привет!\n\n"
-        "📸 Отправь фото — я превращу его в стикер.\n"
-        "🔥 И добавлю немного мемов в твою жизнь.",
+        "👋 Добро пожаловать на мемный завод.\n\n"
+        "📸 Кидай фотки.\n"
+        "🔥 Я превращу их в стикеры.\n\n"
+        "📦 Отправь стикер — и я создам sticker pack.",
         reply_markup=markup
     )
 
@@ -129,9 +151,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
+
     add_user(user_id)
 
     photo = update.message.photo[-1]
+
     file = await photo.get_file()
 
     input_path = f"stickers/{photo.file_unique_id}.jpg"
@@ -140,58 +164,125 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await file.download_to_drive(input_path)
 
     image = Image.open(input_path).convert("RGBA")
+
     image.thumbnail((512, 512))
 
-    canvas = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
+    canvas = Image.new(
+        "RGBA",
+        (512, 512),
+        (0, 0, 0, 0)
+    )
 
     x = (512 - image.width) // 2
     y = (512 - image.height) // 2
 
     canvas.paste(image, (x, y))
 
-    canvas.save(output_path, "WEBP", quality=100)
+    canvas.save(
+        output_path,
+        "WEBP",
+        quality=100
+    )
 
     os.remove(input_path)
 
     add_sticker(user_id, output_path)
 
-    # ================= 1. СТИКЕР =================
+    # ================= ОТПРАВКА ГОТОВОГО СТИКЕРА =================
 
     with open(output_path, "rb") as sticker_file:
-        await update.message.reply_sticker(sticker=sticker_file)
 
-    # ================= 2. ФАЙЛ =================
-
-    with open(output_path, "rb") as file_doc:
-        await update.message.reply_document(
-            document=file_doc,
-            filename="sticker.webp"
+        await update.message.reply_sticker(
+            sticker=sticker_file
         )
 
-    # ================= 3. ПРИКОЛЬНОЕ СООБЩЕНИЕ =================
+    # ================= FUNNY MESSAGE =================
 
     await update.message.reply_text(
         random.choice(FUNNY_MESSAGES)
     )
+
+# ================= STICKER HANDLER =================
+
+async def sticker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user = update.effective_user
+
+    user_id = user.id
+
+    add_user(user_id)
+
+    sticker = update.message.sticker
+
+    file = await sticker.get_file()
+
+    sticker_path = f"stickers/{sticker.file_unique_id}.webp"
+
+    await file.download_to_drive(sticker_path)
+
+    pack_name = random_pack_name(user_id)
+
+    pack_title = f"{user.first_name} MEM PACK"
+
+    try:
+
+        with open(sticker_path, "rb") as f:
+
+            first_sticker = InputSticker(
+                sticker=f,
+                emoji_list=["🔥"]
+            )
+
+            await context.bot.create_new_sticker_set(
+                user_id=user_id,
+                name=pack_name,
+                title=pack_title,
+                stickers=[first_sticker],
+                sticker_format="static"
+            )
+
+        pack_link = f"https://t.me/addstickers/{pack_name}"
+
+        await update.message.reply_text(
+            f"🎉 Стикерпак создан!\n\n{pack_link}"
+        )
+
+    except Exception as e:
+
+        await update.message.reply_text(
+            f"❌ Ошибка:\n{e}"
+        )
 
 # ================= CREATE PACK =================
 
 async def create_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
+
     user_id = user.id
 
     sticker_paths = get_user_stickers(user_id)
 
     if not sticker_paths:
-        await update.message.reply_text("😢 Нет стикеров")
+
+        await update.message.reply_text(
+            "😢 Нет стикеров"
+        )
+
         return
 
     pack_name = random_pack_name(user_id)
+
     pack_title = f"{user.first_name} MEM PACK"
 
+    # ================= ПЕРВЫЙ СТИКЕР =================
+
     with open(sticker_paths[0], "rb") as f:
-        first = InputSticker(f, emoji_list=["😂"])
+
+        first = InputSticker(
+            sticker=f,
+            emoji_list=["😂"]
+        )
 
         await context.bot.create_new_sticker_set(
             user_id=user_id,
@@ -201,9 +292,16 @@ async def create_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sticker_format="static"
         )
 
+    # ================= ОСТАЛЬНЫЕ =================
+
     for path in sticker_paths[1:]:
+
         with open(path, "rb") as f:
-            sticker = InputSticker(f, emoji_list=["🔥"])
+
+            sticker = InputSticker(
+                sticker=f,
+                emoji_list=["🔥"]
+            )
 
             await context.bot.add_sticker_to_set(
                 user_id=user_id,
@@ -212,7 +310,8 @@ async def create_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
     await update.message.reply_text(
-        f"🎉 Готово!\nhttps://t.me/addstickers/{pack_name}"
+        f"🎉 Готово!\n\n"
+        f"https://t.me/addstickers/{pack_name}"
     )
 
     clear_user_stickers(user_id)
@@ -220,10 +319,14 @@ async def create_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================= CLEAR =================
 
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
+
     clear_user_stickers(user_id)
 
-    await update.message.reply_text("🗑 Очищено")
+    await update.message.reply_text(
+        "🗑 Очищено"
+    )
 
 # ================= BUTTONS =================
 
@@ -232,9 +335,13 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if text == "🎨 Создать стикеры":
-        await update.message.reply_text("📸 Отправь фото")
+
+        await update.message.reply_text(
+            "📸 Отправь фото"
+        )
 
     elif text == "🗑 Очистить":
+
         await clear(update, context)
 
 # ================= MAIN =================
@@ -243,15 +350,46 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("createpack", create_pack))
+    app.add_handler(
+        CommandHandler("start", start)
+    )
 
-    app.add_handler(MessageHandler(filters.PHOTO, photo_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, buttons))
+    app.add_handler(
+        CommandHandler("createpack", create_pack)
+    )
+
+    # ================= ФОТО =================
+
+    app.add_handler(
+        MessageHandler(
+            filters.PHOTO,
+            photo_handler
+        )
+    )
+
+    # ================= СТИКЕРЫ =================
+
+    app.add_handler(
+        MessageHandler(
+            filters.Sticker.ALL,
+            sticker_handler
+        )
+    )
+
+    # ================= КНОПКИ =================
+
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            buttons
+        )
+    )
 
     print("BOT STARTED")
 
     app.run_polling()
+
+# ================= START BOT =================
 
 if __name__ == "__main__":
     main()
