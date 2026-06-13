@@ -25,7 +25,7 @@ session = AiohttpSession(
 )
 
 bot = Bot(
-    token=8661575521:AAHD_C0EYhrZPRnYnLxx3zSlsojvt9vp6ic,
+    token="8661575521:AAHD_C0EYhrZPRnYnLxx3zSlsojvt9vp6ic",
     session=session
 )
 BOT_USERNAME = "creaturestck_bot"
