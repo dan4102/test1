@@ -5,8 +5,6 @@ import string
 
 from PIL import Image
 
-from aiogram.client.session.aiohttp import AiohttpSession
-
 from telegram import (
     Update,
     InputSticker,
@@ -20,14 +18,9 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-session = AiohttpSession(
-    proxy="socks5://127.0.0.1:10808"
-)
 
-bot = Bot(
-    token="8661575521:AAHD_C0EYhrZPRnYnLxx3zSlsojvt9vp6ic",
-    session=session
-)
+TOKEN = "8661575521:AAHD_C0EYhrZPRnYnLxx3zSlsojvt9vp6ic"
+
 BOT_USERNAME = "creaturestck_bot"
 
 os.makedirs("stickers", exist_ok=True)
@@ -38,7 +31,7 @@ FUNNY_MESSAGES = [
     "🔥 Готово! Этот стикер теперь будет позорить тебя в чатах.",
     "😂 Уровень кринжа успешно повышен.",
     "💀 Если тебя начнут банить — я не виноват.",
-    "⚡ Новый мем создан. Интернет дрожит.",
+    "⚡️ Новый мем создан. Интернет дрожит.",
     "👀 Я бы это не отправлял... но уже поздно.",
     "🧠 Этот стикер умнее некоторых людей.",
     "📸 Сделано. Теперь это официально мем.",
@@ -196,15 +189,11 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     add_sticker(user_id, output_path)
 
-    # ================= ОТПРАВКА ГОТОВОГО СТИКЕРА =================
-
     with open(output_path, "rb") as sticker_file:
 
         await update.message.reply_sticker(
             sticker=sticker_file
         )
-
-    # ================= FUNNY MESSAGE =================
 
     await update.message.reply_text(
         random.choice(FUNNY_MESSAGES)
@@ -245,8 +234,7 @@ async def sticker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id=user_id,
                 name=pack_name,
                 title=pack_title,
-                stickers=[first_sticker],
-                sticker_format="static"
+                stickers=[first_sticker]
             )
 
         pack_link = f"https://t.me/addstickers/{pack_name}"
@@ -283,8 +271,6 @@ async def create_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pack_title = f"{user.first_name} MEM PACK"
 
-    # ================= ПЕРВЫЙ СТИКЕР =================
-
     with open(sticker_paths[0], "rb") as f:
 
         first = InputSticker(
@@ -296,11 +282,8 @@ async def create_pack(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id=user_id,
             name=pack_name,
             title=pack_title,
-            stickers=[first],
-            sticker_format="static"
+            stickers=[first]
         )
-
-    # ================= ОСТАЛЬНЫЕ =================
 
     for path in sticker_paths[1:]:
 
@@ -356,7 +339,12 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
 
-    app = Application.builder().token(TOKEN).build()
+    app = (
+        Application.builder()
+        .token(TOKEN)
+        .proxy("socks5://127.0.0.1:10808")
+        .build()
+    )
 
     app.add_handler(
         CommandHandler("start", start)
@@ -366,8 +354,6 @@ def main():
         CommandHandler("createpack", create_pack)
     )
 
-    # ================= ФОТО =================
-
     app.add_handler(
         MessageHandler(
             filters.PHOTO,
@@ -375,16 +361,12 @@ def main():
         )
     )
 
-    # ================= СТИКЕРЫ =================
-
     app.add_handler(
         MessageHandler(
             filters.Sticker.ALL,
             sticker_handler
         )
     )
-
-    # ================= КНОПКИ =================
 
     app.add_handler(
         MessageHandler(
