@@ -5,6 +5,8 @@ import string
 
 from PIL import Image
 
+from aiogram.client.session.aiohttp import AiohttpSession
+
 from telegram import (
     Update,
     InputSticker,
@@ -18,9 +20,15 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+session = AiohttpSession(
+    proxy="socks5://127.0.0.1:10808"
+)
 
-TOKEN = "TOKEN" 
-BOT_USERNAME = "NAME"
+bot = Bot(
+    token=8661575521:AAHD_C0EYhrZPRnYnLxx3zSlsojvt9vp6ic,
+    session=session
+)
+BOT_USERNAME = "creaturestck_bot"
 
 os.makedirs("stickers", exist_ok=True)
 
