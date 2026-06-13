@@ -342,7 +342,7 @@ def main():
     app = (
         Application.builder()
         .token(TOKEN)
-        .proxy("http://127.0.0.1:10808")
+        .proxy("http://127.0.0.1:7890")
         .build()
     )
 
